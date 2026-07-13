@@ -1,6 +1,7 @@
 from detectors.rule_based import detect_with_rules
 from detectors.openai_detector import detect_with_openai
-from reports.console_report import print_report
+from reports.console_report import print_console_report
+from reports.json_report import print_json_report
 
 
 def detect_prompt_attack(prompt, method):
@@ -25,13 +26,20 @@ def detect_prompt_attack(prompt, method):
 def main():
     prompt = input("Prompt: ")
     method = input("Detection method [rules/openai]: ")
+    report_format = input("Report format [console/json]: ")
 
     if method == "":
         method = "rules"
 
+    if report_format == "":
+        method = "console"
+
     result = detect_prompt_attack(prompt, method)
 
-    print_report(result)
+    if report_format == "json":
+        print_json_report(result)
+    elif report_format == "console":
+        print_console_report(result)
 
 
 if __name__ == "__main__":
