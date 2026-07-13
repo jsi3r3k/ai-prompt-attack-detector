@@ -64,8 +64,12 @@ def get_recommendation(risk_level):
         return "Prompt should be blocked before reaching the AI model."
 
 
+def normalize_prompt(prompt):
+    return prompt.lower().strip()
+
+
 def detect_with_rules(prompt):
-    normalized_prompt = prompt.lower()
+    normalized_prompt = normalize_prompt(prompt)
     matches = []
 
     for rule in detection_rules:
@@ -100,5 +104,7 @@ def detect_with_rules(prompt):
         "categories": categories,
         "safe_to_process": safe_to_process,
         "recommendation": recommendation,
+        "checked_rules_count": len(detection_rules),
+        "matched_rules_count": len(matches),
         "detection_method": "rule_based",
     }
