@@ -43,7 +43,7 @@ detection_rules = [
 
 
 def get_risk_level(risk_score):
-    if risk_score == 0:
+    if risk_score == 0 or risk_score < 10:
         return "LOW"
     elif risk_score < 50:
         return "MEDIUM"
@@ -91,7 +91,7 @@ def detect_with_rules(prompt):
     recommendation = get_recommendation(risk_level)
     safe_to_process = risk_level in ["LOW", "MEDIUM"]
 
-    result = {
+    return {
         "status": "completed",
         "is_attack": risk_score > 0,
         "risk_score": risk_score,
@@ -102,5 +102,3 @@ def detect_with_rules(prompt):
         "recommendation": recommendation,
         "detection_method": "rule_based",
     }
-
-    return result
