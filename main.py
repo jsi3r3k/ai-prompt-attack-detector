@@ -94,6 +94,7 @@ def detect_with_rules(prompt):
     safe_to_process = risk_level in ["LOW", "MEDIUM"]
 
     result = {
+        "status": "completed",
         "is_attack": risk_score > 0,
         "risk_score": risk_score,
         "risk_level": risk_level,
@@ -113,31 +114,40 @@ def detect_prompt_attack(prompt, method="rules"):
 
     elif method == "openai":
         return {
-            "is_attack": False,
-            "risk_score": 0,
+            "status": "not_configured",
+            "is_attack": None,
+            "risk_score": None,
             "risk_level": "UNKNOWN",
             "matches": [],
             "categories": [],
             "safe_to_process": False,
-            "recommendation": "OpenAI detection mode is not configured yet.",
+            "recommendation": "OpenAI detection mode is not configured yet. Use rules mode for free local detection.",
             "detection_method": "openai_api",
         }
 
     else:
         return {
-            "is_attack": False,
-            "risk_score": 0,
+            "status": "error",
+            "is_attack": None,
+            "risk_score": None,
             "risk_level": "UNKNOWN",
             "matches": [],
             "categories": [],
             "safe_to_process": False,
-            "recommendation": "Unknown detection method selected.",
+            "recommendation": "Unknown detection method selected. Available methods: rules, openai.",
             "detection_method": method,
         }
 
 
 def print_report(result):
-    if result["is_attack"]:
+    if result["status"] != "completed":
+        print("Detection could not be completed.")
+        print("Status:", result["status"])
+        print("Detection method:", result["detection_method"])
+        print("Safe to process:", result["safe_to_process"])
+        print("Recommendation:", result["recommendation"])
+        return
+    elif result["is_attack"]:
         print("Warning: this prompt may be a prompt injection attack.")
         print("Risk score:", result["risk_score"])
         print("Risk level:", result["risk_level"])
@@ -160,9 +170,16 @@ def print_report(result):
         print("Recommendation:", result["recommendation"])
 
 
-if __name__ == "__main__":
-    prompt = input("Prompt: ")
+def main():
+    prompt = input("Give your prompt: ")
+    method = input("Give your method [rules/openai]: ")
 
-    result = detect_prompt_attack(prompt, method="rules")
+    if method == "":
+        method = "rules"
+
+    result = detect_prompt_attack(prompt, method=method)
 
     print_report(result)
+
+if __name__ == "__main__":
+    main()
