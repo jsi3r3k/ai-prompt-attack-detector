@@ -63,10 +63,10 @@ def get_recommendation(risk_level):
     elif risk_level == "CRITICAL":
         return "Prompt should be blocked before reaching the AI model."
     else:
-        return "No risk level like this. Contact with administrator."
+        return "Unknown risk level. Contact the administrator."
 
 
-def detect_prompt_attack(prompt):
+def detect_with_rules(prompt):
     normalized_prompt = prompt.lower()
     matches = []
 
@@ -107,6 +107,35 @@ def detect_prompt_attack(prompt):
     return result
 
 
+def detect_prompt_attack(prompt, method="rules"):
+    if method == "rules":
+        return detect_with_rules(prompt)
+
+    elif method == "openai":
+        return {
+            "is_attack": False,
+            "risk_score": 0,
+            "risk_level": "UNKNOWN",
+            "matches": [],
+            "categories": [],
+            "safe_to_process": False,
+            "recommendation": "OpenAI detection mode is not configured yet.",
+            "detection_method": "openai_api",
+        }
+
+    else:
+        return {
+            "is_attack": False,
+            "risk_score": 0,
+            "risk_level": "UNKNOWN",
+            "matches": [],
+            "categories": [],
+            "safe_to_process": False,
+            "recommendation": "Unknown detection method selected.",
+            "detection_method": method,
+        }
+
+
 def print_report(result):
     if result["is_attack"]:
         print("Warning: this prompt may be a prompt injection attack.")
@@ -134,6 +163,6 @@ def print_report(result):
 if __name__ == "__main__":
     prompt = input("Prompt: ")
 
-    result = detect_prompt_attack(prompt)
+    result = detect_prompt_attack(prompt, method="rules")
 
     print_report(result)
