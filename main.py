@@ -2,6 +2,7 @@ import argparse
 
 from detectors.rule_based import detect_with_rules
 from detectors.openai_detector import detect_with_openai
+from detectors.gemini_detector import detect_with_gemini
 from reports.console_report import print_console_report
 from reports.json_report import print_json_report
 
@@ -11,6 +12,8 @@ def detect_prompt_attack(prompt, method):
         return detect_with_rules(prompt)
     elif method == "openai":
         return detect_with_openai(prompt)
+    elif method == "gemini":
+        return detect_with_gemini(prompt)
     else:
         return {
             "status": "error",
@@ -37,7 +40,7 @@ def parse_arguments():
     parser.add_argument(
         "--method",
         type=str,
-        choices=["rules", "openai"],
+        choices=["rules", "openai", "gemini"],
         default="rules",
         help="Choice method of investigate your prompt."
     )
