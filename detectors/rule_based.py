@@ -1,5 +1,6 @@
 import re
 import unicodedata
+from difflib import SequenceMatcher
 
 from detectors.rules_database import DETECTION_RULES
 
@@ -13,6 +14,136 @@ LEETSPEAK_TABLE = str.maketrans({
     "@": "a",
     "$": "s",
 })
+
+ACTION_TERMS = [
+    "ignore", "disregard", "forget", "bypass", "override", "disable", "remove"
+]
+
+EXTRACTION_TERMS = [
+    "reveal", "show", "print", "display", "leak", "expose", "dump", "export"
+]
+
+AUTHORITY_TERMS = [
+    "previous", "prior", "earlier", "above", "system", "developer", "hidden", "internal"
+]
+
+INSTRUCTION_TERMS = [
+    "instruction", "instructions", "prompt", "message", "messages", "rules", "policy", "policies"
+]
+
+SAFETY_TERMS = [
+    "safety", "guardrails", "guardrail", "moderation", "filter", "filters", "policy", "policies"
+]
+
+SECRET_TERMS = [
+    "secret", "secrets", "token", "tokens", "password", "passwords", "api", "key", "keys", "env"
+]
+
+
+def similarity(first_word, second_word):
+    return SequenceMatcher(None, first_word, second_word).ratio()
+
+
+def find_fuzzy_terms(tokens, terms, threshold=0.82):
+    hits = []
+
+    for token in tokens:
+        for term in terms:
+            score = similarity(token, term)
+        
+            if token == term or score >= threshold:
+                hits.append({
+                    "token": token,
+                    "matched_term": term,
+                    "score": round(score, 2),
+                })
+
+    return hits
+
+
+def add_heuristic_match(matches, match_id, category, severity, description, matched_terms):
+    existing_ids = []
+
+    for match in matches:
+        existing_ids.append(match["id"])
+
+    if match_id in existing_ids:
+        return
+    
+    matches.append({
+        "id": match_id,
+        "phrase": match_id.replace("_", " "),
+        "category": category,
+        "severity":severity,
+        "description":description,
+        "matched_patterns": ["heuristic:fuzzy_semantic_match"],
+        "matched_terms": matched_terms,
+    })
+
+
+def add_heuristic_matches(matches, normalized_prompt):
+    tokens = normalized_prompt.split()
+    
+    action_hits = find_fuzzy_terms(tokens, ACTION_TERMS)
+    extraction_hits = find_fuzzy_terms(tokens, EXTRACTION_TERMS)
+    authority_hits = find_fuzzy_terms(tokens, AUTHORITY_TERMS)
+    instruction_hits = find_fuzzy_terms(tokens, INSTRUCTION_TERMS)
+    safety_hits = find_fuzzy_terms(tokens, SAFETY_TERMS)
+    secret_hits = find_fuzzy_terms(tokens, SECRET_TERMS)
+
+    if action_hits and authority_hits and instruction_hits:
+        add_heuristic_match(
+            matches=matches,
+            match_id="fuzzy_instruction_override",
+            category="instruction_override",
+            severity=55,
+            description="Fuzzy semantic match for instruction override attempt.",
+            matched_terms={
+                "actions": action_hits,
+                "authority_terms": authority_hits,
+                "instruction_terms": instruction_hits,
+            },
+        )
+
+    if action_hits and safety_hits:
+        add_heuristic_match(
+            matches=matches,
+            match_id="fuzzy_safety_bypass",
+            category="safety_bypass",
+            severity=50,
+            description="Fuzzy semantic match for safety bypass attempt.",
+            matched_terms={
+                "actions": action_hits,
+                "safety_terms": safety_hits,
+            },
+        )
+
+    if extraction_hits and authority_hits and instruction_hits:
+        add_heuristic_match(
+            matches=matches,
+            match_id="fuzzy_system_prompt_extraction",
+            category="system_prompt_extraction",
+            severity=60,
+            description="Fuzzy semantic match for system or developer prompt extraction.",
+            matched_terms={
+                "extraction_terms": extraction_hits,
+                "authority_terms": authority_hits,
+                "instruction_terms": instruction_hits,
+            },
+        )
+
+    if extraction_hits and secret_hits:
+        add_heuristic_match(
+            matches=matches,
+            match_id="fuzzy_secret_extraction",
+            category="secret_extraction",
+            severity=70,
+            description="Fuzzy semantic match for secret extraction attempt.",
+            matched_terms={
+                "extraction_terms": extraction_hits,
+                "secret_terms": secret_hits,
+            },
+        )
 
 
 def normalize_prompt(prompt):
@@ -86,6 +217,8 @@ def detect_with_rules(prompt):
                 "description": rule["description"],
                 "matched_patterns": matched_patterns,
             })
+        
+        add_heuristic_matches(matches, normalized_prompt)
 
     risk_score = 0
 
