@@ -9,15 +9,17 @@ from detectors.ai_common import (
     not_configured_result,
 )
 
+from config import OPENAI_API_KEY, OPENAI_MODEL
 
-def detect_with_openai(prompt, model="gpt-5.4-nano"):
-    if os.getenv("OPENAI_API_KEY") is None:
+def detect_with_openai(prompt, model=None):
+    selected_model = model or OPENAI_MODEL
+
+    if OPENAI_API_KEY is None or OPENAI_API_KEY.strip() == "":
         return not_configured_result(
             provider="openai",
-            model=model,
-            message="OpenAI API key is not configured. Set OPENAI_API_KEY to enable OpenAI detection.",
+            model=selected_model,
+            message="OpenAI API key is not configured. Set OPENAI_API_KEY in your .env file.",
         )
-
     try:
         from openai import OpenAI
     except ImportError:

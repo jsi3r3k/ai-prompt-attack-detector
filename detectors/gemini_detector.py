@@ -9,13 +9,17 @@ from detectors.ai_common import (
     not_configured_result,
 )
 
+from config import GEMINI_API_KEY, GEMINI_MODEL
 
-def detect_with_gemini(prompt, model="gemini-3.5-flash"):
-    if os.getenv("GEMINI_API_KEY") is None:
+
+def detect_with_gemini(prompt, model=None):
+    selected_model = model or GEMINI_MODEL
+
+    if GEMINI_API_KEY is None or GEMINI_API_KEY.strip() == "":
         return not_configured_result(
             provider="gemini",
-            model=model,
-            message="Gemini API key is not configured. Set GEMINI_API_KEY to enable Gemini detection.",
+            model=selected_model,
+            message="Gemini API key is not configured. Set GEMINI_API_KEY in your .env file.",
         )
 
     try:
