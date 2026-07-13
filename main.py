@@ -52,15 +52,19 @@ def get_risk_level(risk_score):
     else:
         return "CRITICAL"
 
+
 def get_recommendation(risk_level):
     if risk_level == "LOW":
         return "Prompt looks safe and can be processed."
-    if risk_level == "MEDIUM":
+    elif risk_level == "MEDIUM":
         return "Prompt should be processed with caution."
-    if risk_level == "HIGH":
+    elif risk_level == "HIGH":
         return "Prompt should be reviewed before sending it to the AI model."
-    if risk_level == "CRITICAL":
+    elif risk_level == "CRITICAL":
         return "Prompt should be blocked before reaching the AI model."
+    else:
+        return "No risk level like this. Contact with administrator."
+
 
 def detect_prompt_attack(prompt):
     normalized_prompt = prompt.lower()
