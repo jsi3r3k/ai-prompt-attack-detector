@@ -52,6 +52,15 @@ def get_risk_level(risk_score):
     else:
         return "CRITICAL"
 
+def get_recommendation(risk_level):
+    if risk_level == "LOW":
+        return "Prompt looks safe and can be processed."
+    if risk_level == "MEDIUM":
+        return "Prompt should be processed with caution."
+    if risk_level == "HIGH":
+        return "Prompt should be reviewed before sending it to the AI model."
+    if risk_level == "CRITICAL":
+        return "Prompt should be blocked before reaching the AI model."
 
 def detect_prompt_attack(prompt):
     normalized_prompt = prompt.lower()
@@ -71,11 +80,23 @@ def detect_prompt_attack(prompt):
 
     risk_level = get_risk_level(risk_score)
 
+    categories = []
+
+    for match in matches:
+        if match["category"] not in categories:
+            categories.append(match["category"])
+    
+    recommendation = get_recommendation(risk_level)
+    safe_to_process = risk_level in ["LOW", "MEDIUM"]
+
     result = {
         "is_attack": risk_score > 0,
         "risk_score": risk_score,
         "risk_level": risk_level,
         "matches": matches,
+        "categories": categories,
+        "safe_to_process": safe_to_process,
+        "recommendation": recommendation,
         "detection_method": "rule_based",
     }
 
@@ -87,6 +108,9 @@ def print_report(result):
         print("Warning: this prompt may be a prompt injection attack.")
         print("Risk score:", result["risk_score"])
         print("Risk level:", result["risk_level"])
+        print("Safe to process:", result["safe_to_process"])
+        print("Recommendation:", result["recommendation"])
+        print("Categories:", ", ".join(result["categories"]))
         print("Detection method:", result["detection_method"])
         print("Suspicious matches:")
 
@@ -99,6 +123,8 @@ def print_report(result):
         print("Risk score:", result["risk_score"])
         print("Risk level:", result["risk_level"])
         print("Detection method:", result["detection_method"])
+        print("Safe to process:", result["safe_to_process"])
+        print("Recommendation:", result["recommendation"])
 
 
 if __name__ == "__main__":
