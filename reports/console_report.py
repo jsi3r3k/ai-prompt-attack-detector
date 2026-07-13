@@ -1,4 +1,4 @@
-def print_report(result):
+def print_console_report(result):
     if result["status"] != "completed":
         print("Detection could not be completed.")
         print("Status:", result["status"])
