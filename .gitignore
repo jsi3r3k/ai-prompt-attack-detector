@@ -1,5 +1,17 @@
-.env
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
 .venv/
+venv/
+
+# Environment and secrets
+.env
+.streamlit/secrets.toml
+
+# Test and coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# macOS
 .DS_Store
