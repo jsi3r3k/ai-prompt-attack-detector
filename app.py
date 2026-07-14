@@ -374,6 +374,147 @@ def simplify_matches(matches):
     return simplified
 
 
+def render_rules_explanation(rules_result):
+    st.markdown("##### Local rules analysis")
+
+    matches = rules_result.get("matches", [])
+
+    st.write(
+        "Risk score:",
+        rules_result.get("risk_score", "—"),
+    )
+    st.write(
+        "Risk level:",
+        rules_result.get("risk_level", "UNKNOWN"),
+    )
+
+    if matches:
+        st.write("Matched local security signals:")
+
+        for match in matches:
+            category = match.get("category", "unknown")
+            severity = match.get("severity", "—")
+            description = match.get(
+                "description",
+                "No description available.",
+            )
+
+            st.write(
+                f"- **{category}** "
+                f"(severity {severity}): {description}"
+            )
+    else:
+        st.info("Local rules were executed, but no rule matched.")
+
+
+def render_ai_explanation(ai_result):
+    st.markdown("##### Gemini AI analysis")
+
+    if not ai_result:
+        st.warning("Gemini analysis is not available.")
+        return
+
+    status = ai_result.get("status", "unknown")
+
+    st.write("Provider status:", status)
+    st.write(
+        "Risk score:",
+        ai_result.get("risk_score", "—"),
+    )
+    st.write(
+        "Risk level:",
+        ai_result.get("risk_level", "UNKNOWN"),
+    )
+
+    categories = ai_result.get("categories", [])
+
+    if categories:
+        st.write("AI categories:", ", ".join(categories))
+
+    explanation = (
+        ai_result.get("analysis")
+        or ai_result.get("explanation")
+        or ai_result.get("recommendation")
+    )
+
+    if explanation:
+        st.write("AI explanation:")
+        st.write(explanation)
+
+    if status != "completed":
+        st.warning("Gemini analysis failed.")
+
+        error = ai_result.get("error")
+
+        if error:
+            with st.expander("Gemini provider error"):
+                st.code(str(error))
+
+
+def render_explainability(result):
+    st.markdown("### Explainability panel")
+
+    with st.expander("Why this result?", expanded=True):
+        detection_method = result.get(
+            "detection_method",
+            "unknown",
+        )
+
+        st.write("Detection method:", detection_method)
+
+        rules_result = result.get("rules_result")
+        ai_result = result.get("ai_result")
+
+        if rules_result is not None or ai_result is not None:
+            # Hybrid mode
+            if rules_result is not None:
+                render_rules_explanation(rules_result)
+
+            st.divider()
+
+            if ai_result is not None:
+                render_ai_explanation(ai_result)
+
+            agreement = result.get("engine_agreement")
+
+            st.divider()
+
+            if agreement is True:
+                st.success(
+                    "Engine agreement: Rules and AI reached "
+                    "the same decision."
+                )
+            elif agreement is False:
+                st.warning(
+                    "Engine disagreement: the final result uses "
+                    "the more cautious risk assessment."
+                )
+            else:
+                st.info(
+                    "Engine agreement could not be calculated "
+                    "because the AI provider was unavailable."
+                )
+
+            st.write(
+                "Decision strategy:",
+                result.get("decision_strategy", "unknown"),
+            )
+
+        elif detection_method == "rule_based":
+            # Rules-only mode
+            render_rules_explanation(result)
+
+        elif detection_method == "gemini_api":
+            # Gemini-only mode
+            render_ai_explanation(result)
+
+        else:
+            st.info(
+                "Detailed explainability is not available "
+                "for this detection method."
+            )
+
+
 def render_result(result):
     status = result.get("status", "unknown")
     risk_level = result.get("risk_level", "UNKNOWN")
@@ -441,28 +582,7 @@ def render_result(result):
         st.markdown("#### Matched rules")
         st.dataframe(simplify_matches(matches), use_container_width=True)
 
-    st.markdown("#### Explainability panel")
-    with st.expander("Why this result?", expanded=True):
-        st.write("Detection method:", result.get("detection_method"))
-
-        if result.get("matches"):
-            st.write("The local rules engine matched these suspicious signals:")
-
-            for match in result["matches"]:
-                st.write(
-                    f"- **{match.get('category')}** "
-                    f"(severity {match.get('severity')}): "
-                    f"{match.get('description')}"
-                )
-        else:
-            st.write("No local rules were matched.")
-
-        if result.get("ai_result"):
-            st.write("AI provider result:")
-            st.json(result["ai_result"])
-
-        if result.get("ai_provider_status"):
-            st.write("AI provider fallback status:", result["ai_provider_status"])
+    render_explainability(result)
 
     if result.get("ai_reasoning"):
         with st.expander("AI reasoning"):
@@ -496,7 +616,7 @@ with st.sidebar:
             "rules": "Rules",
             "gemini": "Gemini AI",
             "openai": "OpenAI",
-            "hybrid": "Hybrid: Rules + Gemini",
+            "hybrid": "Hybrid: Rules + Gemini -- recommended",
         }[value],
     )
     

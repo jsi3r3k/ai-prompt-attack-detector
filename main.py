@@ -38,17 +38,33 @@ def detect_with_hybrid(prompt, ai_detector=detect_with_gemini, provider_name="ge
     ai_result = ai_detector(prompt)
 
     if ai_result["status"] != "completed":
-        rules_result["detection_method"] = "hybrid_rules_with_" + provider_name + "_fallback"
-        rules_result["ai_provider"] = provider_name
-        rules_result["ai_provider_status"] = ai_result["status"]
-        rules_result["ai_provider_error"] = ai_result.get("error")
-        rules_result["ai_provider_recommendation"] = ai_result.get("recommendation")
-        rules_result["recommendation"] = (
-            rules_result["recommendation"]
-            + " AI provider was unavailable, so the local rules engine result is shown."
-        )
+        fallback = {
+            "status": "completed",
+            "is_attack": rules_result["is_attack"],
+            "risk_score": rules_result.get("risk_score", 0),
+            "risk_level": rules_result.get("risk_level"),
+            "matches": rules_result.get("matches", []),
+            "categories": rules_result.get("categories", []),
+            "safe_to_process": rules_result.get("safe_to_process", False),
+            "recommendation": (
+                rules_result.get("recommendation", "")
+                + " AI provider was unavailable, so the local rules engine result is shown."
+            ),
+            "detection_method": "hybrid_rules_with_" + provider_name + "_fallback",
+            "ai_provider": provider_name,
+            "ai_provider_status": ai_result.get("status"),
+            "ai_provider_error": ai_result.get("error"),
+            "rules_result": rules_result,
+            "ai_result": ai_result,
+            "engine_agreement": (
+                rules_result.get("is_attack")
+                == ai_result.get("is_attack")
+            ),
+            "decision_source": "rules_and_ai",
+            "decision_strategy": "maximum_risk_score",
+        }
 
-        return rules_result
+        return fallback
 
     combined_score = max(
         rules_result.get("risk_score", 0),
