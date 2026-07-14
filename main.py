@@ -7,13 +7,83 @@ from reports.console_report import print_console_report
 from reports.json_report import print_json_report
 
 
+from detectors.rule_based import detect_with_rules
+from detectors.gemini_detector import detect_with_gemini
+from detectors.openai_detector import detect_with_openai
+
+
+def get_level_from_score(score):
+    if score == 0:
+        return "LOW"
+    elif score < 45:
+        return "MEDIUM"
+    elif score < 75:
+        return "HIGH"
+    else:
+        return "CRITICAL"
+
+
+def combine_categories(first, second):
+    combined = []
+
+    for category in first + second:
+        if category not in combined:
+            combined.append(category)
+
+    return combined
+
+
+def detect_with_hybrid(prompt, ai_detector=detect_with_gemini, provider_name="gemini"):
+    rules_result = detect_with_rules(prompt)
+    ai_result = ai_detector(prompt)
+
+    if ai_result["status"] != "completed":
+        rules_result["detection_method"] = "hybrid_rules_with_" + provider_name + "_fallback"
+        rules_result["ai_provider"] = provider_name
+        rules_result["ai_provider_status"] = ai_result["status"]
+        rules_result["ai_provider_error"] = ai_result.get("error")
+        rules_result["ai_provider_recommendation"] = ai_result.get("recommendation")
+        rules_result["recommendation"] = (
+            rules_result["recommendation"]
+            + " AI provider was unavailable, so the local rules engine result is shown."
+        )
+
+        return rules_result
+
+    combined_score = max(
+        rules_result.get("risk_score", 0),
+        ai_result.get("risk_score", 0),
+    )
+
+    combined_level = get_level_from_score(combined_score)
+
+    return {
+        "status": "completed",
+        "is_attack": rules_result["is_attack"] or ai_result["is_attack"],
+        "risk_score": combined_score,
+        "risk_level": combined_level,
+        "matches": rules_result["matches"],
+        "categories": combine_categories(
+            rules_result.get("categories", []),
+            ai_result.get("categories", []),
+        ),
+        "safe_to_process": combined_level in ["LOW", "MEDIUM"],
+        "recommendation": "Hybrid analysis completed using local rules and AI provider.",
+        "detection_method": "hybrid_rules_and_" + provider_name,
+        "rules_result": rules_result,
+        "ai_result": ai_result,
+    }
+
+
 def detect_prompt_attack(prompt, method):
     if method == "rules":
         return detect_with_rules(prompt)
     elif method == "gemini":
-        return detect_with_ai_fallback(prompt, detect_with_gemini, "gemini")
+        return detect_with_gemini(prompt)
     elif method == "openai":
-        return detect_with_ai_fallback(prompt, detect_with_openai, "openai")
+        return detect_with_openai(prompt)
+    elif method == "hybrid":
+        return detect_with_hybrid(prompt, detect_with_gemini, "gemini")
     else:
         return {
             "status": "error",
@@ -23,7 +93,7 @@ def detect_prompt_attack(prompt, method):
             "matches": [],
             "categories": [],
             "safe_to_process": False,
-            "recommendation": "Unknown detection method selected. Available methods: rules, gemini, openai.",
+            "recommendation": "Unknown detection method selected. Available methods: rules, gemini, openai, hybrid.",
             "detection_method": method,
         }
 
@@ -78,7 +148,7 @@ def parse_arguments():
     parser.add_argument(
         "--method",
         type=str,
-        choices=["rules", "openai", "gemini"],
+        choices=["rules", "openai", "gemini", "hybrid"],
         default="rules",
         help="Choice method of investigate your prompt."
     )
