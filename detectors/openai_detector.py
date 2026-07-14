@@ -57,9 +57,8 @@ def detect_with_openai(prompt, model=None):
         data = json.loads(response.output_text)
 
         return normalize_ai_result(
-            data=data,
-            provider="openai",
-            model=model,
+            data,
+            detection_method="openai_api",
         )
 
     except Exception as error:
