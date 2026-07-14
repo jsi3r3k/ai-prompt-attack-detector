@@ -39,6 +39,123 @@ SECRET_TERMS = [
     "secret", "secrets", "token", "tokens", "password", "passwords", "api", "key", "keys", "env"
 ]
 
+CONTEXTUAL_RULES = [
+    {
+        "id": "contextual_instruction_override",
+        "category": "instruction_override",
+        "severity": 60,
+        "description": (
+            "Attempts to disregard or replace prior instructions, "
+            "guidelines, or rules."
+        ),
+        "pattern": (
+            r"\b(?:disregard|ignore|forget|discard|override|bypass|"
+            r"set\s+aside)\b"
+            r".{0,60}"
+            r"\b(?:previous|prior|earlier|above)\b"
+            r".{0,40}"
+            r"\b(?:instructions?|guidelines?|rules?|directions?|prompts?)\b"
+        ),
+    },
+    {
+        "id": "phishing_content_creation",
+        "category": "social_engineering",
+        "severity": 75,
+        "description": (
+            "Requests the creation of phishing or spear-phishing content."
+        ),
+        "pattern": (
+            r"\b(?:draft|write|create|compose|generate|prepare|craft)\b"
+            r".{0,80}"
+            r"\b(?:phishing|spear[\s-]?phishing)\b"
+            r".{0,30}"
+            r"\b(?:email|message|campaign|template)\b"
+        ),
+    },
+    {
+        "id": "credential_theft_intent",
+        "category": "credential_theft",
+        "severity": 80,
+        "description": (
+            "Requests collecting or stealing passwords, credentials, "
+            "tokens, or login details."
+        ),
+        "pattern": (
+            r"\b(?:steal|harvest|capture|collect|obtain)\b"
+            r".{0,60}"
+            r"\b(?:passwords?|credentials?|login\s+details?|tokens?)\b"
+        ),
+    },
+]
+
+HIGH_RISK_COMBINATIONS = {
+    frozenset(
+        {
+            "instruction_override",
+            "social_engineering",
+        }
+    ): 90,
+    frozenset(
+        {
+            "instruction_override",
+            "credential_theft",
+        }
+    ): 95,
+    frozenset(
+        {
+            "instruction_override",
+            "system_prompt_extraction",
+        }
+    ): 90,
+    frozenset(
+        {
+            "instruction_override",
+            "safety_bypass",
+        }
+    ): 85,
+}
+
+def get_risk_level(risk_score):
+    if risk_score < 25:
+        return "LOW"
+    elif risk_score < 50:
+        return "MEDIUM"
+    elif risk_score < 75:
+        return "HIGH"
+    else:
+        return "CRITICAL"
+
+def calculate_risk_score(matches):
+    if not matches:
+        return 0
+
+    category_scores = {}
+
+    for match in matches:
+        category = match["category"]
+        severity = match["severity"]
+
+        current_score = category_scores.get(category, 0)
+
+        category_scores[category] = max(
+            current_score,
+            severity,
+        )
+
+    categories = set(category_scores)
+
+    risk_score = max(category_scores.values())
+
+    additional_categories = len(category_scores) - 1
+    risk_score += min(20, additional_categories * 10)
+
+    for required_categories, minimum_score in (
+        HIGH_RISK_COMBINATIONS.items()
+    ):
+        if required_categories.issubset(categories):
+            risk_score = max(risk_score, minimum_score)
+
+    return min(risk_score, 100)
 
 def similarity(first_word, second_word):
     return SequenceMatcher(None, first_word, second_word).ratio()
@@ -217,16 +334,22 @@ def detect_with_rules(prompt):
                 "description": rule["description"],
                 "matched_patterns": matched_patterns,
             })
+
+        contextual_matches = detect_contextual_signals(normalized_prompt)
+
+        existing_match_ids = {
+            match.get("id")
+            for match in matches
+        }
+
+        for contextual_match in contextual_matches:
+            if contextual_match["id"] not in existing_match_ids:
+                matches.append(contextual_match)
+                existing_match_ids.add(contextual_match["id"])
         
         add_heuristic_matches(matches, normalized_prompt)
 
-    risk_score = 0
-
-    for match in matches:
-        risk_score += match["severity"]
-
-    if risk_score > 100:
-        risk_score = 100
+    risk_score = calculate_risk_score(matches)
 
     risk_level = get_risk_level(risk_score)
 
@@ -252,3 +375,28 @@ def detect_with_rules(prompt):
         "checked_rules_count": len(DETECTION_RULES),
         "matched_rules_count": len(matches),
     }
+
+def detect_contextual_signals(normalized_prompt):
+    matches = []
+
+    for rule in CONTEXTUAL_RULES:
+        regex_match = re.search(
+            rule["pattern"],
+            normalized_prompt,
+            flags=re.IGNORECASE,
+        )
+
+        if regex_match:
+            matches.append(
+                {
+                        "id": rule["id"],
+                        "phrase": regex_match.group(0),
+                        "category": rule["category"],
+                        "severity": rule["severity"],
+                        "description": rule["description"],
+                        "pattern": rule["pattern"],
+                        "detection_type": "contextual_regex",
+                    }
+            )
+
+    return matches
