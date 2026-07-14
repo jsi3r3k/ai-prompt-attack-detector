@@ -11,7 +11,6 @@ from detectors.ai_common import (
 
 from config import GEMINI_API_KEY, GEMINI_MODEL
 
-
 def detect_with_gemini(prompt):
     api_key = (GEMINI_API_KEY or "").strip()
     model = (GEMINI_MODEL or "gemini-2.5-flash-lite").strip()
@@ -55,9 +54,8 @@ def detect_with_gemini(prompt):
         data = json.loads(interaction.output_text)
 
         return normalize_ai_result(
-            data=data,
-            provider="gemini",
-            model=model,
+            data,
+            detection_method="gemini_api",
         )
 
     except Exception as error:
