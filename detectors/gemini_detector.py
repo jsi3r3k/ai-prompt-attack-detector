@@ -12,15 +12,23 @@ from detectors.ai_common import (
 from config import GEMINI_API_KEY, GEMINI_MODEL
 
 
-def detect_with_gemini(prompt, model=None):
-    selected_model = model or GEMINI_MODEL
+def detect_with_gemini(prompt):
+    api_key = (GEMINI_API_KEY or "").strip()
+    model = (GEMINI_MODEL or "gemini-2.5-flash-lite").strip()
 
-    if GEMINI_API_KEY is None or GEMINI_API_KEY.strip() == "":
-        return not_configured_result(
-            provider="gemini",
-            model=selected_model,
-            message="Gemini API key is not configured. Set GEMINI_API_KEY in your .env file.",
-        )
+    if not api_key:
+        return {
+            "status": "error",
+            "is_attack": False,
+            "risk_score": None,
+            "risk_level": "UNKNOWN",
+            "matches": [],
+            "categories": [],
+            "safe_to_process": False,
+            "recommendation": "Gemini API key is not configured.",
+            "detection_method": "gemini_api",
+            "error": "Missing GEMINI_API_KEY.",
+        }
 
     try:
         from google import genai
